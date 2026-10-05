@@ -1,6 +1,6 @@
 # QA API Automation — RestAssured + JUnit5 + Allure
 
-![API Tests](https://github.com/gustavaom7/qa-api-testing/actions/workflows/api-tests.yml/badge.svg)
+![API Tests](https://github.com/gustavaom7/api-testing-restassured/actions/workflows/api-tests.yml/badge.svg)
 
 A professional-grade **API automation testing framework** built with RestAssured, JUnit5, and Allure Reports. This repository demonstrates contract testing, security testing, and automated CI/CD reporting for REST APIs.
 
@@ -21,7 +21,7 @@ A professional-grade **API automation testing framework** built with RestAssured
 ## 🏗️ Architecture
 
 ```
-qa-api-testing/
+api-testing-restassured/
 ├── src/test/java/com/gustavaom7/
 │   ├── api/              # API client builders
 │   ├── helpers/          # Utility classes, APIClient
@@ -89,8 +89,8 @@ qa-api-testing/
 
 ```bash
 # Clone and navigate
-git clone https://github.com/gustavaom7/qa-api-testing.git
-cd qa-api-testing
+git clone https://github.com/gustavaom7/api-testing-restassured.git
+cd api-testing-restassured
 
 # Make Gradle executable (if needed)
 chmod +x gradlew

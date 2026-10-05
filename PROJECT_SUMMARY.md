@@ -13,7 +13,7 @@ A production-ready API testing framework with:
 ## 📁 Directory Structure
 
 ```
-qa-api-testing/
+api-testing-restassured/
 ├── src/test/java/com/gustavaom7/
 │   ├── helpers/             # APIClient builder, utilities
 │   ├── models/              # Response POJOs (Gson)
@@ -102,8 +102,8 @@ qa-api-testing/
 ### Quick Start
 ```bash
 # Clone
-git clone https://github.com/gustavaom7/qa-api-testing.git
-cd qa-api-testing
+git clone https://github.com/gustavaom7/api-testing-restassured.git
+cd api-testing-restassured
 
 # Run tests
 chmod +x gradlew
