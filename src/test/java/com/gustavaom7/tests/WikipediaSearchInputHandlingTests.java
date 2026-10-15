@@ -13,9 +13,15 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Epic("Wikipedia API")
-@Feature("Security Testing")
-@DisplayName("Wikipedia Search - Security Tests")
-class WikipediaSearchSecurityTests {
+/**
+ * Input handling: injection-style, oversized and special-character queries must come back as an
+ * ordinary search result. These are read-only searches any visitor could type into the search box,
+ * a few dozen requests a week; they check robustness of a public API, not its security. Attack
+ * testing belongs against a target you own.
+ */
+@Feature("Input handling")
+@DisplayName("Wikipedia Search - Input Handling Tests")
+class WikipediaSearchInputHandlingTests {
 
     private static final String WIKIPEDIA_API_BASE = "https://en.wikipedia.org/w/api.php";
 
@@ -24,7 +30,7 @@ class WikipediaSearchSecurityTests {
         RestAssured.requestSpecification = new APIClient(WIKIPEDIA_API_BASE).withLogging(true).build();
     }
 
-    @ParameterizedTest(name = "Injection test: {0}")
+    @ParameterizedTest(name = "Injection-style query: {0}")
     @ValueSource(strings = {
             "'; DROP TABLE users; --",
             "1' OR '1'='1",
@@ -33,10 +39,10 @@ class WikipediaSearchSecurityTests {
             "${7*7}",
             "java.lang.Runtime"
     })
-    @DisplayName("API should safely handle injection attempts in search")
-    @Description("Verify API escapes/handles malicious input without errors")
-    @Severity(SeverityLevel.CRITICAL)
-    void searchShouldHandleInjectionAttempts(String maliciousInput) {
+    @DisplayName("Injection-style strings are searched as plain text")
+    @Description("The query comes back as a normal search response, with no error object or server trace")
+    @Severity(SeverityLevel.NORMAL)
+    void searchTreatsInjectionStringsAsText(String maliciousInput) {
         Response response = given()
                 .queryParam("action", "query")
                 .queryParam("format", "json")
@@ -64,9 +70,9 @@ class WikipediaSearchSecurityTests {
                 .doesNotContain("Fatal error:");
     }
 
-    @ParameterizedTest(name = "Large input: {0} chars")
+    @ParameterizedTest(name = "Long query: {0} chars")
     @ValueSource(ints = {100, 1000, 5000})
-    @DisplayName("API should handle large input without buffer overflow")
+    @DisplayName("Long queries get a normal response or a clean 400")
     @Severity(SeverityLevel.NORMAL)
     void searchShouldHandleLargeInput(int inputLength) {
         String largeInput = "a".repeat(inputLength);
@@ -82,9 +88,8 @@ class WikipediaSearchSecurityTests {
                 .extract()
                 .response();
 
-        // Should not crash or timeout
         assertThat(response.getStatusCode())
-                .as("API should handle large input without crashing")
+                .as("long query handled without a server error")
                 .isIn(200, 400);
     }
 
@@ -115,10 +120,10 @@ class WikipediaSearchSecurityTests {
             "%3C", // <
             "%3E"  // >
     })
-    @DisplayName("URL-encoded malicious input should be handled safely")
+    @DisplayName("Percent-encoded characters are searched as text")
     @Severity(SeverityLevel.NORMAL)
-    void searchShouldHandleEncodedMaliciousInput(String encodedInput) {
-        // RestAssured automatically handles encoding, but let's verify it's safe
+    void searchShouldHandleEncodedInput(String encodedInput) {
+        // RestAssured encodes the value again, so the API receives the literal "%27" text.
         Response response = given()
                 .queryParam("action", "query")
                 .queryParam("format", "json")
@@ -131,8 +136,7 @@ class WikipediaSearchSecurityTests {
                 .response();
 
         assertThat(response.getStatusCode()).isIn(200, 400);
-        assertThat(response.getBody().asString())
-                .doesNotContain("Exception")
-                .doesNotContain("error");
+        // Checked on the error object, not on the word "error": search snippets can contain it.
+        assertThat(response.jsonPath().getMap("error")).as("error object").isNull();
     }
 }
