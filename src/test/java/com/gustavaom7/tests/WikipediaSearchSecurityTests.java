@@ -49,14 +49,19 @@ class WikipediaSearchSecurityTests {
                 .extract()
                 .response();
 
-        // Should not throw 500 error
-        assertThat(response.getStatusCode()).isEqualTo(200);
+        // The payload is treated as plain search text: a normal search response, no error object.
+        // (The body itself is not scanned for words like "Exception": search snippets legitimately
+        // contain them, e.g. "java.lang.Runtime" matches articles about RuntimeException.)
+        assertThat(response.jsonPath().getMap("error")).as("error object").isNull();
+        assertThat(response.jsonPath().getString("batchcomplete")).as("batchcomplete").isNotNull();
+        assertThat(response.jsonPath().getInt("query.searchinfo.totalhits")).as("totalhits").isGreaterThanOrEqualTo(0);
+        assertThat(response.jsonPath().getList("query.search")).as("search results").isNotNull();
 
-        // Should not expose stack traces
+        // Server-side failure signatures must never reach the client.
         assertThat(response.getBody().asString())
-                .doesNotContain("Exception")
-                .doesNotContain("SQLException")
-                .doesNotContain("stack trace");
+                .doesNotContain("Exception in thread")
+                .doesNotContain("Traceback (most recent call last)")
+                .doesNotContain("Fatal error:");
     }
 
     @ParameterizedTest(name = "Large input: {0} chars")
