@@ -1,5 +1,6 @@
 package com.gustavaom7.helpers;
 
+import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.RestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.filter.log.RequestLoggingFilter;
@@ -14,6 +15,9 @@ import org.slf4j.LoggerFactory;
  */
 public class APIClient {
     private static final Logger logger = LoggerFactory.getLogger(APIClient.class);
+
+    public static final String USER_AGENT =
+            "api-testing-restassured/1.0 (https://github.com/gustavaom7/api-testing-restassured; portfolio test suite)";
 
     private String baseURL;
     private long responseTimeout = 5000;
@@ -31,7 +35,12 @@ public class APIClient {
         RequestSpecBuilder builder = new RequestSpecBuilder()
                 .setBaseUri(baseURL)
                 .setContentType("application/json")
-                .addHeader("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                // Wikimedia asks API clients for a descriptive User-Agent with a contact URL;
+                // generic or spoofed browser agents can be rate limited or blocked.
+                .addHeader("User-Agent", USER_AGENT);
+
+        // Attaches every request and response to the Allure report.
+        builder.addFilter(new AllureRestAssured());
 
         if (enableLogging) {
             builder.addFilter(new RequestLoggingFilter())

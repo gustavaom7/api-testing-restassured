@@ -1,5 +1,6 @@
 package com.gustavaom7.tests;
 
+import com.gustavaom7.helpers.APIClient;
 import io.qameta.allure.*;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
@@ -20,7 +21,7 @@ class WikipediaSearchSecurityTests {
 
     @BeforeAll
     static void setUp() {
-        RestAssured.baseURI = WIKIPEDIA_API_BASE;
+        RestAssured.requestSpecification = new APIClient(WIKIPEDIA_API_BASE).withLogging(true).build();
     }
 
     @ParameterizedTest(name = "Injection test: {0}")

@@ -49,4 +49,10 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Allure results land in build/ so `gradle clean` removes them and CI knows where to look.
+    systemProperty 'allure.results.directory', layout.buildDirectory.dir('allure-results').get().asFile.absolutePath
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
 }

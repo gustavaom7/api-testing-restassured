@@ -115,10 +115,8 @@ chmod +x gradlew
 ### Generate Allure Report
 
 ```bash
-# Generate and open report
-./gradlew allureReport allureServe
-
-# Report opens in default browser (http://localhost:4040)
+# Results are written to build/allure-results; Allure's CLI needs Node and Java
+npx allure-commandline serve build/allure-results
 ```
 
 ## 📊 Test Results & Reporting
@@ -131,13 +129,12 @@ After running tests, Allure Report provides:
 - **History**: Trend analysis across runs
 
 **Access Report:**
-```bash
-./gradlew allureServe
-```
+- Latest `main` run: https://gustavaom7.github.io/api-testing-restassured/
+- Locally: `npx allure-commandline serve build/allure-results`
 
 ### GitHub Actions
-- Daily runs at **9 AM UTC**
-- On every **push** and **pull request**
+- On every **push** to `main`, every **pull request**, weekly (Monday 09:17 UTC) and on demand
+- The Allure report of the latest `main` run is published to GitHub Pages
 - Slack notifications for pass/fail
 - Artifacts: Allure reports, test results
 
@@ -222,18 +219,18 @@ Push/PR/Schedule
     ↓
 Checkout Code
     ↓
-Setup Java (11)
+Setup Java (17)
     ↓
 Run Tests (./gradlew test)
     ↓
-Generate Allure Report
+Generate Allure Report (artifact)
     ↓
-Upload Artifacts
+Notify Slack (✅/❌, only if SLACK_WEBHOOK_URL is set)
     ↓
-Notify Slack (✅/❌)
+Publish report to GitHub Pages (main only)
 ```
 
-**Schedule**: Daily at 9 AM UTC + on every PR
+**Schedule**: push to main, every PR, weekly on Monday and on demand
 
 ## 🚦 Current Status
 

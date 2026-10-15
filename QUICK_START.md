@@ -44,9 +44,9 @@ BUILD SUCCESSFUL
 
 #### Generate Allure Report (recommended)
 ```bash
-./gradlew allureReport allureServe
+npx allure-commandline serve build/allure-results
 ```
-Opens Allure dashboard in browser (http://localhost:4040)
+Opens the Allure dashboard in your browser (needs Node and Java)
 
 #### View test summary
 ```bash

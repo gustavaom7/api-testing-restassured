@@ -112,9 +112,10 @@ class WikipediaSearchSmokeTests {
     }
 
     @Test
-    @DisplayName("Empty search should return empty results, not error")
+    @DisplayName("Empty search returns a validation error, not a server error")
+    @Description("The API rejects an empty srsearch with HTTP 200 and an error object (missingparam), never a 5xx or an empty result list")
     @Severity(SeverityLevel.NORMAL)
-    void emptySearchShouldReturnEmptyResults() {
+    void emptySearchShouldReturnValidationError() {
         Response response = given()
                 .queryParam("action", "query")
                 .queryParam("format", "json")
@@ -127,8 +128,9 @@ class WikipediaSearchSmokeTests {
                 .extract()
                 .response();
 
-        SearchResponse searchResponse = response.as(SearchResponse.class);
-        assertThat(searchResponse.getSearchResults()).isEmpty();
+        assertThat(response.jsonPath().getString("error.code")).isEqualTo("missingparam");
+        assertThat(response.jsonPath().getString("error.info")).contains("srsearch");
+        assertThat(response.jsonPath().getMap("query")).isNull();
     }
 
     @Test

@@ -1,15 +1,26 @@
 name: API Automation Tests
 
 on:
+  push:
+    branches: [ main ]
   pull_request:
     branches: [ main, develop ]
+  schedule:
+    # Weekly, Monday 09:17 UTC: catches changes on the Wikipedia API side without spending minutes daily.
+    - cron: "17 9 * * 1"
   workflow_dispatch:
+
+concurrency:
+  group: api-tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     name: API Tests - RestAssured + Allure
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
     steps:
       - name: Checkout code
@@ -18,84 +29,77 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'temurin'
           cache: gradle
 
       - name: Run API tests
-        run: |
-          chmod +x gradlew
-          ./gradlew test --info
-        continue-on-error: true
+        run: ./gradlew test
 
-      - name: Generate Allure Report
-        if: always()
+      - name: Test summary
+        if: ${{ !cancelled() }}
         run: |
-          ./gradlew allureReport
+          shopt -s nullglob
+          files=(build/test-results/test/TEST-*.xml)
+          if [ ${#files[@]} -eq 0 ]; then echo "No test results" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          sum() { grep -ho "$1=\"[0-9]*\"" "${files[@]}" | head -n ${#files[@]} | grep -o '[0-9]*' | paste -sd+ | bc; }
+          tests=$(sum tests); failures=$(sum failures); errors=$(sum errors); skipped=$(sum skipped)
+          {
+            echo "## API tests"
+            echo ""
+            echo "| Tests | Passed | Failed | Skipped |"
+            echo "| --- | --- | --- | --- |"
+            echo "| $tests | $((tests - failures - errors - skipped)) | $((failures + errors)) | $skipped |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Allure Results
-        if: always()
+      - name: Generate Allure report
+        if: ${{ !cancelled() }}
+        run: |
+          if [ ! -d build/allure-results ]; then echo "No Allure results"; exit 0; fi
+          npx --yes allure-commandline@2.46.1 generate build/allure-results --clean -o build/allure-report
+
+      - name: Upload Allure report
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: allure-results
+          name: allure-report
           path: build/allure-report/
+          if-no-files-found: ignore
+          retention-days: 14
 
-      - name: Generate Test Summary
-        if: always()
-        id: test-summary
+      # Slack is optional: without the SLACK_WEBHOOK_URL secret these steps are skipped instead of failing the run.
+      - name: Notify Slack
+        if: ${{ !cancelled() && env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          PASSED=$(grep -o 'passed' build/test-results/test/TEST-*.xml | wc -l)
-          FAILED=$(grep -o 'failures="[0-9]*"' build/test-results/test/TEST-*.xml | grep -o '[0-9]*' | paste -sd+ | bc || echo 0)
-          echo "PASSED=$PASSED" >> $GITHUB_OUTPUT
-          echo "FAILED=$FAILED" >> $GITHUB_OUTPUT
+          if [ "$STATUS" = "success" ]; then icon="✅"; else icon="❌"; fi
+          text="$icon API Automation Tests: $STATUS · ${{ github.repository }}@${{ github.ref_name }} · $RUN_URL"
+          curl -sS -X POST -H 'Content-type: application/json' --data "$(jq -n --arg t "$text" '{text: $t}')" "$SLACK_WEBHOOK_URL"
 
-      - name: Notify Slack on Failure
-        if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
+  # Publishes the latest Allure report from main (push, schedule or manual run) to GitHub Pages.
+  # Needs Settings → Pages → Source: GitHub Actions.
+  publish-report:
+    name: Publish Allure report
+    needs: test
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
         with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          payload: |
-            {
-              "text": "❌ API Automation Tests Failed",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*API Automation Tests - Failed*\n*Repo:* ${{ github.repository }}\n*Branch:* ${{ github.ref_name }}\n*Commit:* ${{ github.sha }}"
-                  }
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View Workflow"
-                      },
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                    }
-                  ]
-                }
-              ]
-            }
-
-      - name: Notify Slack on Success
-        if: success()
-        uses: slackapi/slack-github-action@v1.24.0
+          name: allure-report
+          path: allure-report
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          payload: |
-            {
-              "text": "✅ API Automation Tests Passed",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*API Automation Tests - Passed ✅*\n*Repo:* ${{ github.repository }}\n*Branch:* ${{ github.ref_name }}"
-                  }
-                }
-              ]
-            }
+          path: allure-report
+      - id: deploy
+        uses: actions/deploy-pages@v4

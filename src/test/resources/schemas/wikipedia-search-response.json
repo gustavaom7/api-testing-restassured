@@ -5,7 +5,7 @@
   "required": ["batchcomplete", "query"],
   "properties": {
     "batchcomplete": {
-      "type": "boolean"
+      "type": ["string", "boolean"]
     },
     "query": {
       "type": "object",
