@@ -1,6 +1,6 @@
 # QA API Automation — RestAssured + JUnit5 + Allure
 
-![API Tests](https://github.com/gustavaom7/api-testing-restassured/actions/workflows/api-tests.yml/badge.svg)
+[![API Tests](https://github.com/gustavaom7/api-testing-restassured/actions/workflows/api-tests.yml/badge.svg?branch=main)](https://github.com/gustavaom7/api-testing-restassured/actions/workflows/api-tests.yml)
 
 A professional-grade **API automation testing framework** built with RestAssured, JUnit5, and Allure Reports. This repository demonstrates contract testing, security testing, and automated CI/CD reporting for REST APIs.
 
@@ -81,7 +81,7 @@ api-testing-restassured/
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Java 11+
+- Java 11+ (CI runs on 17)
 - Gradle 7.0+
 - Git
 
@@ -234,12 +234,14 @@ Publish report to GitHub Pages (main only)
 
 ## 🚦 Current Status
 
-- ✅ **Smoke Tests**: 5 tests passing
-- ✅ **Contract Tests**: 5 tests passing
-- ✅ **Security Tests**: 5 tests passing
-- ✅ **Allure Reporting**: Integrated
-- ✅ **CI/CD**: Active (daily + PR)
-- ✅ **Slack Notifications**: Configured
+32 tests against the live Wikipedia search API, green in CI (about 30 s of test time):
+
+- ✅ **Smoke**: 8 tests (search results, several terms, timestamps, empty-search validation, response time)
+- ✅ **Contract**: 4 tests (JSON schema, required fields, content type, numeric types)
+- ✅ **Security**: 20 tests (injection payloads, special and URL-encoded characters, large input)
+- ✅ **Allure report**: request/response attachments, [published from `main`](https://gustavaom7.github.io/api-testing-restassured/)
+- ✅ **CI/CD**: push to main, PRs, weekly and on demand
+- ⚪ **Slack**: optional, runs only when the `SLACK_WEBHOOK_URL` secret is set
 
 ## 📞 Support & Contributions
 
