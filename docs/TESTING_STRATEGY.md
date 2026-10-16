@@ -1,199 +1,32 @@
-# API Testing Strategy
+# Testing Strategy
 
-## Overview
+## What is under test
 
-This document outlines the testing strategy for the QA API Automation suite, covering approach, trade-offs, and decision rationale.
+The Wikipedia search API (`https://en.wikipedia.org/w/api.php?action=query&list=search`): public, read-only, no authentication. It is someone else's production system, which shapes every choice below: few requests, a descriptive User-Agent, and no attack traffic.
 
-## Test Pyramid
+## Test layers
 
-```
-        △
-       / \
-      /   \  E2E / Smoke Tests (5 tests)
-     /-----\
-    /       \  Contract Tests (5 tests)
-   /         \
-  /-----------\
- /             \ Security Tests (5 tests)
-/______________\
-```
+| Layer | Class | Tests | Question it answers |
+|---|---|---|---|
+| Smoke | `WikipediaSearchSmokeTests` | 8 | Does search return sane results for common terms, valid timestamps, a validation error for an empty query, and respond in time? |
+| Contract | `WikipediaSearchContractTests` | 4 | Does the response still match the JSON schema, field types and content type the client relies on? |
+| Input handling | `WikipediaSearchInputHandlingTests` | 20 | Are injection-style, special-character, percent-encoded and long queries handled as plain text, without an error object or server trace? |
 
-**Philosophy**: Emphasis on **contract** and **security** testing, with smoke tests as sanity checks. This balances coverage against execution time and maintenance burden.
+Contract tests matter most here: a public API can change shape without notice, and the schema in `src/test/resources/schemas/` is what would catch it.
 
-## Test Categories & Rationale
+### Input handling is not security testing
 
-### 1. Smoke Tests (Functional Verification)
+The input-handling queries (`'; DROP TABLE users; --`, `<script>alert('XSS')</script>`, `{{7*7}}`, 5000-character strings) are strings any visitor could type into Wikipedia's search box. The tests check that they come back as ordinary search results. They do not probe for vulnerabilities, and the suite never should against a system it does not own. Real attack payloads belong against a local target (planned: a service started with Testcontainers or WireMock).
 
-**Purpose**: Verify basic API functionality and response structure.
+## Test data
 
-**Coverage:**
-- Search with common queries ("Java", "Python", etc.)
-- Response contains expected fields
-- Batch completion flag is set
-- Timestamps are valid
+- Fixed, stable search terms (`Java`, `Python`, `Database`, `API`, `Testing`): Wikipedia always has articles for them.
+- Risk: if search ranking or article content changes, a smoke assertion can fail. That is acceptable for a demo and is exactly what the weekly run is there to surface.
 
-**Rationale:**
-- Quick feedback on API availability
-- Catch obvious breaking changes
-- Base layer for other test types
+## Flakiness
 
-**Execution Time**: ~5-10 seconds (5 tests)
+The suite talks to a live service over the internet, so a slow response or a transient network error can fail a run. There are no automatic retries: a red run is investigated, not re-run until green. The response-time test uses a generous budget so normal latency does not trip it.
 
-### 2. Contract Tests (Structural Validation)
+## Continuous integration
 
-**Purpose**: Ensure API response adheres to expected schema and contains all required fields.
-
-**Coverage:**
-- JSON Schema validation via `json-schema-validator`
-- Type consistency (numbers are numbers, not strings)
-- Required fields presence across all results
-- Content-Type correctness
-
-**Rationale:**
-- Detects breaking changes to response structure
-- Type mismatches often indicate data serialization bugs
-- Schema-driven testing scales to complex APIs
-- Catches issues earlier than integration tests
-
-**Execution Time**: ~5-10 seconds (5 tests)
-
-### 3. Security Tests (Input Handling)
-
-**Purpose**: Verify API handles malicious input safely without crashing or exposing internals.
-
-**Coverage:**
-- SQL injection attempts: `'; DROP TABLE users; --`
-- XSS payloads: `<script>alert('XSS')</script>`
-- Template injection: `{{7*7}}`, `${7*7}`
-- Java reflection: `java.lang.Runtime`
-- Large input (buffer overflow): 1KB-5KB strings
-- Special characters: `<>`, `&&`, `||`, etc.
-- URL-encoded payloads
-
-**Rationale:**
-- Wikipedia API is public-facing; defense against abuse is critical
-- Tests verify safe error handling (200 response with no crash)
-- Doesn't assume API is "behind a firewall" (good practice)
-- Validates escaping/encoding is done correctly
-
-**Execution Time**: ~10-15 seconds (5 tests)
-
-**Important Note**: These tests assume **external API protection** (e.g., WAF, rate limiting). They do NOT test authentication or authorization (out of scope).
-
-## What's NOT Tested (Trade-offs)
-
-### Performance Testing
-- **Why excluded**: Wikipedia API is public and stable; internal APIs need load testing.
-- **How to add**: Use tools like `k6` or `JMeter` in a separate suite.
-
-### End-to-End Workflows
-- **Why excluded**: API tests focus on individual endpoints, not multi-step flows.
-- **How to add**: Create integration tests that chain endpoint calls.
-
-### Authentication & Authorization
-- **Why excluded**: Wikipedia Search API is public (no auth). Auth testing requires credentials.
-- **How to add**: Add a separate test suite for authenticated endpoints.
-
-### Data-Driven Tests at Scale
-- **Why excluded**: Test data is static (common search terms); large datasets belong in performance tests.
-- **How to add**: Use `@ParameterizedTest` with CSV/JSON data providers.
-
-## Test Data Strategy
-
-### Search Queries (Smoke & Contract Tests)
-- **Fixed set**: "Java", "Python", "API", "Testing", "Technology"
-- **Rationale**: Wikipedia has stable, consistent results for these terms
-- **Risk**: If Wikipedia removes articles, tests fail (acceptable for this demo)
-
-### Injection Payloads (Security Tests)
-- **Fixed set**: SQL, XSS, template injection, Java reflection
-- **Rationale**: Testing for known patterns, not generating random payloads
-- **Coverage**: Covers OWASP Top 10 input validation gaps
-
-### Input Size (Security Tests)
-- **100, 1000, 5000 characters**: Tests buffer overflow risk
-- **Rationale**: Catches issues at boundary conditions
-
-## Flakiness & Resilience
-
-### Expected Flakiness
-- **Wikipedia API timeout**: ~1-2% (network latency)
-- **Seasonal result changes**: ~0.5% (article content updates)
-
-### Mitigation
-- **3-second timeout**: Allows slow networks without hanging
-- **Parameterized tests**: Repeat queries catch transient failures
-- **Allure retry logic**: Can re-run failed tests automatically
-
-### Monitoring
-- Allure Report tracks retry rate
-- GitHub Actions logs capture failures
-- Slack notifications alert on consistent failures
-
-## Continuous Integration
-
-### Schedule
-- **Daily**: 9 AM UTC (off-peak for Wikipedia servers)
-- **On push/PR**: Immediate feedback for developers
-
-### Artifacts
-- **Allure Report**: HTML report with detailed results
-- **Test Results**: JUnit XML for integration with other tools
-
-### Notifications
-- **Slack**: Pass/fail alerts in team channel
-- **GitHub**: Check runs on PRs
-
-## Scaling to Production APIs
-
-To adapt this suite for your own API:
-
-1. **Update Base URL**: Change `WIKIPEDIA_API_BASE` to your API endpoint
-2. **Create Response Models**: Define POJOs with `@SerializedName` annotations
-3. **Add JSON Schema**: Create `.json` schema files in `src/test/resources/schemas/`
-4. **Adjust Test Data**: Replace public queries with your endpoint's realistic use cases
-5. **Add Authentication**: Use RestAssured's `.auth()` for API keys or OAuth
-6. **Configure Timeouts**: Adjust `.withTimeout()` based on your SLAs
-
-### Example for Custom API
-```java
-// Base configuration
-private static final String API_BASE = "https://api.example.com/v2";
-private static final String API_KEY = System.getenv("API_KEY");
-
-// Build request with auth
-RequestSpecification spec = new RequestSpecBuilder()
-    .setBaseUri(API_BASE)
-    .addHeader("Authorization", "Bearer " + API_KEY)
-    .build();
-
-// Use in tests
-given(spec)
-    .queryParam("search", "example")
-    .get("/search")
-    .then()
-    .statusCode(200);
-```
-
-## Future Enhancements
-
-### Short-term (Weeks 1-2)
-- [ ] Add performance baselines (p50, p95 latency)
-- [ ] Implement retry logic for transient failures
-- [ ] Add database seeding/cleanup for integration tests
-
-### Medium-term (Weeks 3-6)
-- [ ] GraphQL API testing (if applicable)
-- [ ] Contract testing with Pact (bi-directional)
-- [ ] Load testing with k6
-
-### Long-term (Weeks 7+)
-- [ ] Chaos testing (inject faults into API)
-- [ ] Mutation testing (verify tests catch bugs)
-- [ ] Multi-environment matrix (staging, production)
-
----
-
-**Last Updated**: 2026-07-30  
-**Author**: Gustavo Mesquita  
-**Version**: 1.0
+`.github/workflows/api-tests.yml` runs on push to `main`, on every pull request, weekly (Monday 09:17 UTC) and on demand. It publishes the Allure report of `main` to GitHub Pages and posts to Slack when the `SLACK_WEBHOOK_URL` secret is set.

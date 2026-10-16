@@ -80,15 +80,15 @@ curl "https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&sr
    - `title`, `snippet` must be strings
    - `batchcomplete` must be boolean
 
-### Security Test Scenarios
+### Input Handling Scenarios
 
 1. **SQL Injection**
    - Input: `'; DROP TABLE users; --`
-   - Expected: 200 response, no error exposure
+   - Expected: 200 response, searched as plain text, no error object
 
 2. **XSS Payload**
    - Input: `<script>alert('XSS')</script>`
-   - Expected: 200 response, escaped in output
+   - Expected: 200 response, searched as plain text
 
 3. **Template Injection**
    - Input: `{{7*7}}`, `${7*7}`
@@ -134,7 +134,7 @@ curl "https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&sr
 ### Smoke Tests Use:
 - AssertJ fluent assertions for readability
 - Hamcrest matchers for response validation
-- Custom models (Gson POJOs) for type-safe assertions
+- Custom models (Jackson-mapped POJOs) for type-safe assertions
 
 **Example**:
 ```java
@@ -154,15 +154,13 @@ assertThat(response.getSearchResults())
 .body("query.search[0].pageid", isA(Number.class))
 ```
 
-### Security Tests Use:
-- String content verification
+### Input Handling Tests Use:
+- The error object of the response, not words in the body (search snippets can contain "error" or "Exception")
 - Status code validation
 
 **Example**:
 ```java
-assertThat(response.getBody().asString())
-    .doesNotContain("Exception")
-    .doesNotContain("SQLException");
+assertThat(response.jsonPath().getMap("error")).as("error object").isNull();
 ```
 
 ## Extending the Tests
@@ -199,10 +197,11 @@ void testName() {
 ### Add New Response Model
 
 1. Create class in `src/test/java/com/gustavaom7/models/`
-2. Use Gson annotations:
+2. Annotate fields for Jackson, which RestAssured uses for mapping when it is on the classpath:
 ```java
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class MyResponse {
-    @SerializedName("field_name")
+    @JsonProperty("field_name")
     private String fieldName;
 
     public String getFieldName() {
@@ -287,7 +286,7 @@ curl https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&srs
 - ✅ Use appropriate `@Severity` level
 
 ### Organizing Tests
-- ✅ Group by type (Smoke, Contract, Security)
+- ✅ Group by type (Smoke, Contract, Input handling)
 - ✅ Use `@Feature` for logical grouping
 - ✅ Keep test data close to test logic
 - ✅ Avoid test interdependencies (each test standalone)

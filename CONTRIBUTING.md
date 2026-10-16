@@ -25,9 +25,9 @@ This is a portfolio project demonstrating API testing best practices. Contributi
 ### Adding Response Models
 
 1. Create POJO in `src/test/java/com/gustavaom7/models/`
-2. Use Gson annotations for JSON mapping:
+2. Use Jackson annotations for JSON mapping (RestAssured maps with Jackson):
    ```java
-   @SerializedName("json_field_name")
+   @JsonProperty("json_field_name")
    private String javaFieldName;
    ```
 

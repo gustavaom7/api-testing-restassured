@@ -2,7 +2,7 @@
 
 [![API Tests](https://github.com/gustavaom7/api-testing-restassured/actions/workflows/api-tests.yml/badge.svg?branch=main)](https://github.com/gustavaom7/api-testing-restassured/actions/workflows/api-tests.yml)
 
-A professional-grade **API automation testing framework** built with RestAssured, JUnit5, and Allure Reports. This repository demonstrates contract testing, security testing, and automated CI/CD reporting for REST APIs.
+A professional-grade **API automation testing framework** built with RestAssured, JUnit5, and Allure Reports. This repository demonstrates smoke, contract and input-handling tests against a live public API, with automated CI/CD reporting.
 
 > **Portfolio Project**: Built to showcase best practices in API automation testing alongside mobile (Maestro) and E2E (Cypress/Playwright) testing suites.
 
@@ -12,10 +12,10 @@ A professional-grade **API automation testing framework** built with RestAssured
 |---|---|---|
 | REST API testing at scale | RestAssured + parameterized tests | ✅ |
 | Contract testing | JSON Schema validation | ✅ |
-| Security testing (basics) | Injection, buffer overflow tests | ✅ |
-| CI/CD automation | GitHub Actions on PR + manual trigger (daily/push cron disabled to control Actions minutes) | ✅ |
+| Input handling | Injection-style, special-character and long queries come back as ordinary results | ✅ |
+| CI/CD automation | GitHub Actions on push to main, PRs, weekly and on demand | ✅ |
 | Slack notifications | Pass/fail alerts to team | ✅ |
-| Type-safe models | Gson-based POJOs for responses | ✅ |
+| Type-safe models | Jackson-mapped POJOs for responses | ✅ |
 | Best practices | Builder pattern, logging, custom assertions | ✅ |
 
 ## 🏗️ Architecture
@@ -23,13 +23,12 @@ A professional-grade **API automation testing framework** built with RestAssured
 ```
 api-testing-restassured/
 ├── src/test/java/com/gustavaom7/
-│   ├── api/              # API client builders
 │   ├── helpers/          # Utility classes, APIClient
-│   ├── models/           # Response POJOs (Gson)
+│   ├── models/           # Response POJOs (Jackson)
 │   ├── tests/            # Test classes organized by type
 │   │   ├── *SmokeTests.java
 │   │   ├── *ContractTests.java
-│   │   └── *SecurityTests.java
+│   │   └── *InputHandlingTests.java
 │   └── resources/
 │       └── schemas/      # JSON Schema files for contract tests
 ├── .github/workflows/
@@ -66,17 +65,16 @@ api-testing-restassured/
 - Numeric fields have correct types
 - Field presence across all results
 
-### Security Tests (`WikipediaSearchSecurityTests`)
-- Injection attempt handling (SQL, XSS, template injection)
-- Large input buffer overflow protection
-- Special character handling
-- URL-encoded malicious input
+### Input Handling Tests (`WikipediaSearchInputHandlingTests`)
+- Injection-style strings (SQL, XSS, template syntax) are searched as plain text
+- Long queries (100 to 5000 characters) get a normal response or a clean 400
+- Special and percent-encoded characters
 
 **Key Tests:**
-- SQL injection attempts return 200 (not vulnerable)
-- XSS payloads handled safely
-- Large inputs don't crash API
-- Special characters properly escaped
+- An injection-style query returns a normal search response with no error object or server trace
+- Special characters and percent-encoded input never produce an API error
+
+These are read-only searches that any visitor could type into Wikipedia's search box, a few dozen requests a week with a descriptive User-Agent. They check how a public API handles unusual input. They are **not** security testing: attack payloads belong against a target you own, which is the next step for this repo (a local service under Testcontainers/WireMock).
 
 ## 🚀 Quick Start
 
@@ -175,36 +173,31 @@ Test results tracked per-run:
 
 View in Allure Report → **Overview** tab.
 
-## 🔐 Security Considerations
+## 🔐 Scope
 
-### Tests Include
-- ✅ SQL injection simulation
-- ✅ XSS payload handling
-- ✅ Buffer overflow (large input)
-- ✅ Special character escaping
+### Included
+- ✅ Injection-style and special-character queries handled as text
+- ✅ Long queries handled without a server error
 
-### Not Included (Scope)
-- Authentication/authorization testing (separate suite)
-- HTTPS/TLS validation
-- Rate limiting/DDoS testing
-- Data privacy (GDPR, PII handling)
+### Not included
+- Security testing of any kind against Wikipedia (it is someone else's production system)
+- Authentication/authorization, TLS, rate limiting, data privacy
 
 ## 📚 Test Data
 
 Tests use:
 - **Public APIs**: Wikipedia (no auth required)
 - **Fixed queries**: "Java", "Python", "API" (stable results)
-- **Faker**: For generated data where needed (see `com.github.javafaker`)
 
 ## 🏆 Best Practices Demonstrated
 
 1. **Builder Pattern**: `APIClient` for consistent configuration
-2. **Type-Safe Models**: Gson POJOs for response deserialization
+2. **Type-Safe Models**: Jackson-mapped POJOs for response deserialization
 3. **Parameterized Tests**: `@ParameterizedTest` for scenario variation
 4. **Allure Annotations**: `@Epic`, `@Feature`, `@Severity` for organization
 5. **Logging**: SLF4J + Logback for debugging
 6. **Assertions**: AssertJ for readable, fluent assertions
-7. **Organized Tests**: Grouped by type (Smoke, Contract, Security)
+7. **Organized Tests**: Grouped by type (Smoke, Contract, Input handling)
 8. **CI/CD Ready**: GitHub Actions with artifacts and notifications
 
 ## 📖 Documentation
@@ -238,7 +231,7 @@ Publish report to GitHub Pages (main only)
 
 - ✅ **Smoke**: 8 tests (search results, several terms, timestamps, empty-search validation, response time)
 - ✅ **Contract**: 4 tests (JSON schema, required fields, content type, numeric types)
-- ✅ **Security**: 20 tests (injection payloads, special and URL-encoded characters, large input)
+- ✅ **Input handling**: 20 tests (injection-style, special and percent-encoded characters, long queries)
 - ✅ **Allure report**: request/response attachments, [published from `main`](https://gustavaom7.github.io/api-testing-restassured/)
 - ✅ **CI/CD**: push to main, PRs, weekly and on demand
 - ⚪ **Slack**: optional, runs only when the `SLACK_WEBHOOK_URL` secret is set
@@ -249,4 +242,4 @@ Questions or improvements? Open an issue or contact [@gustavaom7](https://github
 
 ---
 
-**Part of**: QA Automation Portfolio ([Maestro Mobile](https://github.com/gustavaom7/maestro) • [Playwright Web](https://github.com/gustavaom7/playwright) • [Cypress Web](https://github.com/gustavaom7/cypress))
+**Part of**: QA Automation Portfolio ([Playwright Web](https://github.com/gustavaom7/playwright-typescript-e2e-framework) • [Appium Mobile](https://github.com/gustavaom7/appium-mobile-e2e-framework) • [Cypress Web + API](https://github.com/gustavaom7/cypress-hybrid-suite) • [Maestro Mobile](https://github.com/gustavaom7/maestro-mobile-ai-qa) • [Portfolio](https://gustavaom7.github.io/))
